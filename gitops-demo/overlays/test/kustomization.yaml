@@ -6,7 +6,7 @@ patchesStrategicMerge:
 - ./deployment-patch.yaml
 
 images:
-- name: hishabdev/demo
+- name: muntashir/demo
   newTag: 25591bcea50f38c45f94f1fd8a318d151606f1b5
 resources:
 - ../../base
