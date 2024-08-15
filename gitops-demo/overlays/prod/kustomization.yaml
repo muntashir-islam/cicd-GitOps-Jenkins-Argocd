@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+
+patchesStrategicMerge:
+- ./deployment-patch.yaml
+
+images:
+- name: hishabdev/demo
+  newTag: cae60e8afb264807ff340d7608e9df7fc937bc0b
+resources:
+- ../../base
+namespace: production

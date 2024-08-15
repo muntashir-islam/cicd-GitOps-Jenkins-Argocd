@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: demo
+    version: v1.0
+  name: demo
+  namespace: test
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: demo
+        resources:
+          limits:
+            cpu: 500m
+            memory: 600Mi

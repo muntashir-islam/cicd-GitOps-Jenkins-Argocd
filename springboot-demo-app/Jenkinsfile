@@ -1,0 +1,116 @@
+pipeline {
+    agent {label 'master'}
+    tools {
+        gradle "Default"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                sh 'pwd'
+                sh 'echo star-pipeline!!!!'
+                git branch: 'main', url: 'https://github.com/muntashir-islam/cicd-GitOps-Jenkins-Argocd.git'
+                sh 'pwd'
+                sh 'ls'
+            }
+        }
+        stage('Build and release demo project') {
+            steps {
+                milestone(1)
+                 sh 'gradle build'
+            }
+        }
+
+        stage('Test demo'){
+            steps{
+                sh 'gradle test'
+            }
+            
+        }   
+        stage("Build Docker File") {
+            steps {
+                script {
+                    demo = docker.build("muntashir/demo", "--no-cache .",)
+                }
+            }
+        }
+
+        stage('Push Docker Image test deploy') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry-1.docker.io', 'docker_hub_login') {
+                        demo.push("${env.GIT_COMMIT}")
+                      }
+                }
+            }
+        }
+
+        stage('Deploy Test') {
+            steps {
+
+                sh "rm -rf gitops-*"
+                sh "git clone git@github.com:muntashir-islam/cicd-GitOps-Jenkins-Argocd.git"
+                sh "git config --global user.email 'ci@ci.com'"
+                dir("gitops-demo") {
+                    sh "cd ./gitops-demo/overlays/test && kustomize edit set image muntashir/demo:${env.GIT_COMMIT}"
+                    sh "git commit -am 'Publish new version' && git push || echo 'no changes'"
+                    deleteDir()
+                }
+                sh "rm -rf gitops-*"
+                
+            }
+        }
+       
+
+        stage("Approval for Production") {
+            steps {
+                script { 
+                    try {
+                        timeout(time: 15, unit: "SECONDS"){
+                         userInput = input(id: 'Proceed1', message: 'Promote build?', parameters: [[$class: 'BooleanParameterDefinition', defaultValue: true, description: '', name: 'Please confirm you agree to deploy in production']])
+                         echo 'userInput: ' + userInput
+                        }
+                        sleep(time: 5, unit: "SECONDS")
+                       currentBuild.result = "SUCCESS" 
+                    } catch (Throwable e) {
+                        echo "Caught ${e.toString()}"
+                        currentBuild.result = "SUCCESS" 
+                    }
+                }
+            }
+        }
+        
+
+        stage('Deploy to Prod') {
+            steps {
+                script{
+                    if(userInput){
+                        sh "rm -rf gitops-demo" 
+                        // sh "git clone https://user:token@github.com/hishabdevs/gitops-demo.git"
+                        sh "git clone git@github.com:muntashir-islam/cicd-GitOps-Jenkins-Argocd.git"
+                        sh "git config --global user.email 'ci@ci.com'"
+                        dir("gitops-demo") {
+                            sh "cd ./gitops-demo/overlays/prod && kustomize edit set image  muntashir/demo:${env.GIT_COMMIT}"
+                            sh "git commit -am 'Publish new version' && git push || echo 'no changes'"
+                        }
+                        deleteDir()
+                    }
+                    
+                        currentBuild.result = "SUCCESS"
+
+                }
+            }
+        }
+
+
+        
+    
+    }
+    post {
+            success {
+            slackSend channel: '#jenkins-ci',
+                  color: 'good',
+                  message: "The pipeline ${currentBuild.fullDisplayName} completed successfully."
+            }
+        }
+}   
