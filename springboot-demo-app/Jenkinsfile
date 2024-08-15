@@ -4,16 +4,42 @@ pipeline {
         gradle "Default"
     }
 
+    options {
+        buildDiscarder logRotator( 
+                    daysToKeepStr: '15', 
+                    numToKeepStr: '10'
+            )
+    }
+
+    environment {
+        APP_NAME = "DEMO_APP"
+        envMode = getEnvMode() //optional
+    }
+
     stages {
-        stage('Checkout') {
+        stage('Cleanup Workspace') {
             steps {
-                sh 'pwd'
-                sh 'echo star-pipeline!!!!'
-                git branch: 'main', url: 'https://github.com/muntashir-islam/cicd-GitOps-Jenkins-Argocd.git'
-                sh 'pwd'
-                sh 'ls'
+                cleanWs()
+                sh """
+                echo "Cleaned Up Workspace for ${APP_NAME}"
+                """
             }
         }
+        stage('Code Checkout') {
+            steps {
+                // sh 'pwd'
+                // sh 'echo star-pipeline!!!!'
+                // git branch: 'main', url: 'https://github.com/muntashir-islam/cicd-GitOps-Jenkins-Argocd.git'
+                // sh 'pwd'
+                // sh 'ls'
+                checkout([
+                    $class: 'GitSCM', 
+                    branches: [[name: '*/main']], 
+                    userRemoteConfigs: [[url: 'https://github.com/muntashir-islam/cicd-GitOps-Jenkins-Argocd.git']]
+                ])
+            }
+        }
+
         stage('Build and release demo project') {
             steps {
                 milestone(1)
@@ -102,6 +128,9 @@ pipeline {
         
 
         stage('Deploy to Prod') {
+            when {
+                branch 'main'
+            }
             steps {
                 script{
                     if(userInput){
@@ -121,9 +150,6 @@ pipeline {
                 }
             }
         }
-
-
-        
     
     }
     post {
@@ -134,3 +160,11 @@ pipeline {
             }
         }
 }   
+
+def getEnvMode(){
+    if(env.BRANCH_NAME == 'development'){
+        return "develop";
+    } else if(env.BRANCH_NAME == 'main'){
+        return "production";
+    } 
+}
